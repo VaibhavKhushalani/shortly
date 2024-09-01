@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import axios from "axios";
 import styled from "styled-components";
 import ShortenDesktop from "../assests/bg-shorten-desktop.svg";
 import Statistics from "./Statistics";
@@ -256,7 +257,7 @@ const Loading = styled.h4`
 `;
 
 const MainComponent = () => {
-  const [items] = useState([]);
+  const [items, setItems] = useState([]);
   const [result, setResult] = useState(false);
   const [text, setText] = useState({ text: "", colortext: "" });
   const [buttontext, setButtonText] = useState("Copy");
@@ -276,40 +277,45 @@ const MainComponent = () => {
   };
 
   const AddData = async () => {
-    setText({ text: "Shortening your link wait...", colortext: "" });
+    if (items.find((item) => item.link === user.input)) {
+      setText({ text: "Link already present in List", colortext: "" });
+      setError({ border: "3px solid #e45452", placeholdertext: "#e8b7b7" });
+      return false;
+    }
+
+    setText({ text: "Shortening your link, please wait...", colortext: "" });
     setError({ border: "0px", placeholdertext: "#9e9aa7" });
 
-    const response = await fetch(
-      `https://api.shrtco.de/v2/shorten?url=${user.input}`
-    );
-    setUser(await response.json());
+    try {
+      // Fetch data from API
+      const response = await axios.get(
+        `https://ulvis.net/api.php?url=${user.input}&private=1`
+      );
+      // Check response status
+      if (response.status === 200) {
+        const data = response.data;
+        const arrData = {
+          link: user.input,
+          shortlink: data,
+          id: Math.random(),
+        };
 
-    if (!user.input) {
-      setText({ colortext: "Please add a Link" });
+        // Update items and states
+        setItems((prevItems) => [...prevItems, arrData]); // Update items using functional update
+        setResult(true);
+        setText({ text: "", colortext: "" });
+        setUser((prevUser) => ({ ...prevUser, input: "" })); // Reset input
+        setButtonText("Copy");
+        setUpdate(0);
+      } else {
+        throw new Error(`Unexpected response status: ${response.status}`);
+      }
+    } catch (error) {
+      console.error("Error shortening the link:", error);
+      setText({ colortext: "An error occurred. Please try again." });
       setError({ border: "3px solid #e45452", placeholdertext: "#e8b7b7" });
     }
   };
-
-  //updating link state at modification
-  useEffect(() => {
-    if (user.ok === true) {
-      let data = {
-        link: user.result.original_link,
-        shortlink: user.result.short_link,
-        id: user.result.code,
-      };
-      items.push(data);
-
-      setResult(true);
-      setText({ text: "", colortext: "" });
-      user.input = "";
-      setButtonText("Copy");
-      setUpdate();
-      user.ok = false;
-    }
-  }, [items, user]);
-
- 
 
   const CopyData = (e, value) => {
     if (update === e) {
@@ -318,7 +324,6 @@ const MainComponent = () => {
       setUpdate(e);
       setButtonText("Copied!");
       navigator.clipboard.writeText(value);
-  
     }
   };
 
@@ -329,24 +334,22 @@ const MainComponent = () => {
           <ResultGroup>
             {items.map((elem, id) => {
               return (
-                <>
-                  <Result>
-                    <div className="link-field">
-                      <h5 className="user-link">{elem.link} </h5>
-                      <h5 className="shorty-link">{elem.shortlink}</h5>
+                <Result key={id}>
+                  <div className="link-field">
+                    <h5 className="user-link">{elem.link} </h5>
+                    <h5 className="shorty-link">{elem.shortlink}</h5>
 
-                      <DesignButton
-                        className={
-                          id === update ? "copyUpdateButton" : "copybutton"
-                        }
-                        href="#"
-                        onClick={() => CopyData(id, elem.shortlink)}
-                      >
-                        {id === update ? buttontext : "Copy"}
-                      </DesignButton>
-                    </div>
-                  </Result>
-                </>
+                    <DesignButton
+                      className={
+                        id === update ? "copyUpdateButton" : "copybutton"
+                      }
+                      href="#"
+                      onClick={() => CopyData(id, elem.shortlink)}
+                    >
+                      {id === update ? buttontext : "Copy"}
+                    </DesignButton>
+                  </div>
+                </Result>
               );
             })}
           </ResultGroup>
